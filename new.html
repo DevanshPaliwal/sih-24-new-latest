@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js Building Analysis with BIPV and Rooftop Solar</title>
+    <style>
+      :root {
+        --primary-color: #2196f3;
+        --secondary-color: #1976d2;
+        --success-color: #4caf50;
+        --warning-color: #ffc107;
+        --shadow-color: #607d8b;
+        --text-color: #333;
+        --panel-bg: rgba(255, 255, 255, 0.95);
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        color: var(--text-color);
+      }
+
+      canvas {
+        display: block;
+      }
+
+      .controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 100;
+        background: var(--panel-bg);
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        width: 300px;
+      }
+
+      .control-group {
+        margin-bottom: 15px;
+      }
+
+      .control-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      input[type="datetime-local"],
+      input[type="number"] {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
+
+      button {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        width: 100%;
+        margin-bottom: 8px;
+        transition: background-color 0.2s;
+      }
+
+      button:hover {
+        background: var(--secondary-color);
+      }
+
+      .info-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: var(--panel-bg);
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+        max-height: 80vh;
+        overflow-y: auto;
+        width: 350px;
+      }
+
+      .info-section {
+        margin-bottom: 20px;
+      }
+
+      .info-section h3 {
+        margin: 0 0 10px 0;
+        padding-bottom: 5px;
+        border-bottom: 2px solid var(--primary-color);
+        font-size: 16px;
+      }
+
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+
+      .light-bar {
+        height: 20px;
+        margin: 5px 0;
+        border-radius: 4px;
+      }
+
+      .fully-lit {
+        background-color: var(--success-color);
+      }
+
+      .partially-lit {
+        background-color: var(--warning-color);
+      }
+
+      .shadowed {
+        background-color: var(--shadow-color);
+      }
+
+      /* Scrollbar styling */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #666;
+      }
+
+      /* Tooltip */
+      [data-tooltip] {
+        position: relative;
+        cursor: help;
+      }
+
+      [data-tooltip]:before {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 5px 10px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      [data-tooltip]:hover:before {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .heatmap-legend {
+        display: flex;
+        flex-direction: column;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .heatmap-gradient {
+        height: 20px;
+        width: 100%;
+        background: linear-gradient(
+          to right,
+          #313695,
+          /* Deep blue */ #4575b4,
+          /* Blue */ #74add1,
+          /* Light blue */ #abd9e9,
+          /* Very light blue */ #fee090,
+          /* Light yellow */ #fdae61,
+          /* Orange */ #f46d43,
+          /* Dark orange */ #d73027 /* Red */
+        );
+        margin: 5px 0;
+      }
+      .heatmap-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+      }
+
+      .heatmap-legend {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: var(--panel-bg);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        width: 250px;
+        z-index: 1000;
+      }
+
+      .heatmap-gradient {
+        height: 20px;
+        width: 100%;
+        margin: 10px 0;
+        border-radius: 4px;
+        background: linear-gradient(
+          to right,
+          #440154,
+          /* Dark Purple - Low */ #472c7a,
+          #3b528b,
+          #2c728e,
+          #21918c,
+          #28ae80,
+          #5ec962,
+          #addc30,
+          #fde725 /* Yellow - High */
+        );
+      }
+      .chart-container {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: var(--panel-bg);
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        width: 600px;
+        z-index: 1000;
+      }
+
+      .chart-title {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 15px;
+        color: var(--text-color);
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 5px;
+      }
+      canvas#lightingChart {
+        width: 100% !important;
+        height: 300px !important;
+        margin: 0;
+      }
+      .heatmap-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--text-color);
+        margin-top: 5px;
+      }
+
+      .legend-title {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 10px;
+        color: var(--text-color);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="controls">
+      <div class="control-group">
+        <label for="timeInput" data-tooltip="Select date and time"
+          >Date & Time</label
+        >
+        <input type="datetime-local" id="timeInput" />
+      </div>
+
+      <div class="control-group">
+        <label for="latInput" data-tooltip="Building latitude">Latitude</label>
+        <input type="number" id="latInput" step="0.0001" />
+      </div>
+
+      <div class="control-group">
+        <label for="longInput" data-tooltip="Building longitude"
+          >Longitude</label
+        >
+        <input type="number" id="longInput" step="0.0001" />
+      </div>
+
+      <div class="control-group">
+        <label for="ghiInput" data-tooltip="Global Horizontal Irradiance"
+          >GHI (kWh/m²/day)</label
+        >
+        <input type="number" id="ghiInput" step="0.01" />
+      </div>
+
+      <button
+        onclick="updateFromInputs()"
+        data-tooltip="Update sun position based on inputs"
+      >
+        Update Sun Position
+      </button>
+      <button
+        onclick="startSimulation()"
+        data-tooltip="Run full day simulation"
+      >
+        Start Day Simulation
+      </button>
+    </div>
+    <div id="infoPanel" class="info-panel"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/utils/BufferGeometryUtils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      let globalAddArray = null;
+      // Constants
+      const AHMEDABAD_LAT = 23.0225;
+      const AHMEDABAD_LONG = 72.5714;
+      const DEFAULT_GHI = 5.5; // Default GHI value for Ahmedabad
+      const MIN_HEIGHT = 1; // Minimum height above ground
+      const MOVEMENT_SPEED = 2;
+      let keys = {};
+
+      // Scene setup
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(100, 100, 100);
+      camera.lookAt(0, 0, 0);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxDistance = 500;
+      controls.minDistance = 10;
+
+      // First, disable orbit controls auto-rotation
+      controls.autoRotate = false;
+      controls.enableDamping = false; // Optional: disable damping for more direct control
+      controls.autoRotate = false;
+      controls.enableDamping = false;
+      controls.enablePan = true;
+      controls.enableZoom = true;
+      controls.minDistance = 1;
+      controls.maxDistance = 1000;
+      controls.minPolarAngle = 0;
+      controls.maxPolarAngle = Math.PI / 2; // Limit to 90 degrees to prevent going below ground
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 8000;
+      sunLight.shadow.mapSize.height = 8000;
+      sunLight.shadow.camera.near = 1;
+      sunLight.shadow.camera.far = 500;
+      sunLight.shadow.camera.left = -200;
+      sunLight.shadow.camera.right = 200;
+      sunLight.shadow.camera.top = 200;
+      sunLight.shadow.camera.bottom = -200;
+      sunLight.shadow.bias = -0.0005;
+      scene.add(sunLight);
+
+      const sunGeometry = new THREE.SphereGeometry(0, 32, 32);
+      const sunMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffff00,
+        emissive: 0xffff00,
+        emissiveIntensity: 1,
+      });
+      const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+      scene.add(sunMesh);
+
+      // Sky dome
+      const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+      const skyMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          topColor: { value: new THREE.Color(0x0077ff) },
+          bottomColor: { value: new THREE.Color(0xffffff) },
+          offset: { value: 400 },
+          exponent: { value: 0.6 },
+          sunPosition: { value: new THREE.Vector3() },
+        },
+        vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+        fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        uniform vec3 sunPosition;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize(vWorldPosition + offset).y;
+          float sunFactor = max(dot(normalize(vWorldPosition), normalize(sunPosition)), 0.0);
+          vec3 skyColor = mix(bottomColor, topColor, pow(max(h, 0.0), exponent));
+          if(sunFactor > 0.98) {
+            skyColor = mix(skyColor, vec3(1.0, 0.8, 0.4), 0.6);
+          }
+          gl_FragColor = vec4(skyColor, 1.0);
+        }
+      `,
+        side: THREE.BackSide,
+        depthWrite: false,
+      });
+      const skyDome = new THREE.Mesh(skyGeometry, skyMaterial);
+      scene.add(skyDome);
+
+      // Ground
+      const groundGeometry = new THREE.PlaneGeometry(8000, 8000);
+      const groundMaterial = new THREE.MeshStandardMaterial({
+        color: 0x555555,
+        roughness: 0.8,
+        metalness: 0.2,
+        side: THREE.DoubleSide,
+      });
+      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = 0;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // Variables
+      let selectedObject = null;
+      const originalMaterials = new Map();
+      const objects = new Map();
+
+      // Highlight material
+      const highlightMaterial = new THREE.MeshStandardMaterial({
+        color: 0x00ff00,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+      });
+
+      // Add at top with other globals
+      let isSimulating = false;
+      let simulationObject = null;
+
+      // Add after your variable declarations
+      let raycaster = new THREE.Raycaster();
+      let mouse = new THREE.Vector2();
+
+      // Functions
+      function updateSunPosition(latitude, longitude, datetime) {
+        const sunPos = SunCalc.getPosition(datetime, latitude, longitude);
+        const distance = 100;
+
+        const phi = Math.PI / 2 - sunPos.altitude;
+        const theta = sunPos.azimuth;
+
+        const x = distance * Math.sin(phi) * Math.cos(theta);
+        const y = distance * Math.cos(phi);
+        const z = distance * Math.sin(phi) * Math.sin(theta);
+
+        sunLight.position.set(x, y, z);
+        sunMesh.position.set(x, y, z);
+
+        // Update sky shader sun position
+        skyMaterial.uniforms.sunPosition.value.copy(sunLight.position);
+      }
+
+      function updateFromInputs() {
+        const datetime = new Date(document.getElementById("timeInput").value);
+        const lat =
+          parseFloat(document.getElementById("latInput").value) ||
+          AHMEDABAD_LAT;
+        const long =
+          parseFloat(document.getElementById("longInput").value) ||
+          AHMEDABAD_LONG;
+
+        updateSunPosition(lat, long, datetime);
+      }
+
+      function analyzeObject(object) {
+        if (!object?.isMesh) return null;
+
+        const geometry = object.geometry;
+        if (
+          !geometry?.attributes?.position ||
+          !geometry?.attributes?.normal ||
+          !geometry?.index
+        )
+          return null;
+
+        const sunDir = sunLight.position.clone().normalize();
+        const normalMatrix = new THREE.Matrix3().getNormalMatrix(
+          object.matrixWorld
+        );
+
+        let totalArea = 0;
+        let roofArea = 0;
+        let fullyLitArea = 0;
+        let partiallyLitArea = 0;
+        let shadowedArea = 0;
+
+        const position = geometry.attributes.position;
+        const normalAttr = geometry.attributes.normal;
+        const index = geometry.index;
+        const triangleCount = index.count / 3;
+
+        const intensities = new Float32Array(triangleCount);
+
+        for (let i = 0; i < triangleCount; i++) {
+          const i3 = i * 3;
+          const ai = index.getX(i3);
+          const bi = index.getX(i3 + 1);
+          const ci = index.getX(i3 + 2);
+
+          const a = new THREE.Vector3().fromBufferAttribute(position, ai);
+          const b = new THREE.Vector3().fromBufferAttribute(position, bi);
+          const c = new THREE.Vector3().fromBufferAttribute(position, ci);
+
+          const normal = new THREE.Vector3()
+            .fromBufferAttribute(normalAttr, ai)
+            .applyMatrix3(normalMatrix)
+            .normalize();
+
+          // Skip bottom surfaces (facing downward)
+          if (normal.y < -0.7) {
+            intensities[i] = 0; // Set intensity to 0 for bottom surfaces
+            continue; // Skip area calculations for bottom surfaces
+          }
+
+          const area = Math.floor(calculateTriangleArea(a, b, c) * 100) / 100;
+
+          // Only add to total area if not a bottom surface
+          totalArea += area;
+
+          // Calculate intensity for non-bottom surfaces
+          const intensity = calculateIntensity(normal, sunDir);
+          intensities[i] = intensity;
+
+          // Identify roof surfaces (facing upward)
+          if (normal.y > 0.7) {
+            roofArea += area;
+          }
+
+          // Categorize lighting based on intensity
+          if (intensity > 0.6) {
+            fullyLitArea += area;
+          } else if (intensity > 0.3) {
+            partiallyLitArea += area;
+          } else {
+            shadowedArea += area;
+          }
+        }
+
+        const ghi =
+          parseFloat(document.getElementById("ghiInput").value) || DEFAULT_GHI;
+        const pvEfficiency = 0.2;
+        const performanceRatio = 0.75;
+
+        // Calculate vertical area (total area minus roof area, bottom surfaces already excluded)
+        const verticalArea = totalArea - roofArea;
+        const verticalEfficiency = 0.7;
+        const bipvPotential =
+          Math.floor(
+            fullyLitArea *
+              ghi *
+              pvEfficiency *
+              performanceRatio *
+              verticalEfficiency *
+              100
+          ) / 100;
+
+        const roofEfficiency = 0.9;
+        const rooftopPotential =
+          Math.floor(
+            roofArea *
+              ghi *
+              pvEfficiency *
+              performanceRatio *
+              roofEfficiency *
+              100
+          ) / 100;
+
+        const totalLitArea = fullyLitArea + partiallyLitArea + shadowedArea;
+
+        return {
+          name: object.name || `Unnamed (${object.id})`,
+          vertices: geometry.attributes.position.count,
+          position: object.position,
+          totalArea: Math.floor(totalArea * 100) / 100,
+          roofArea: Math.floor(roofArea * 100) / 100,
+          fullyLitArea: Math.floor(fullyLitArea * 100) / 100,
+          partiallyLitArea: Math.floor(partiallyLitArea * 100) / 100,
+          shadowedArea: Math.floor(shadowedArea * 100) / 100,
+          fullyLitPercent:
+            Math.floor((fullyLitArea / totalLitArea) * 100 * 100) / 100,
+          partiallyLitPercent:
+            Math.floor((partiallyLitArea / totalLitArea) * 100 * 100) / 100,
+          shadowedPercent:
+            Math.floor((shadowedArea / totalLitArea) * 100 * 100) / 100,
+          bipvPotential,
+          rooftopPotential,
+          totalPotential:
+            Math.floor((bipvPotential + rooftopPotential) * 100) / 100,
+          intensities,
+        };
+      }
+
+      function displayObjectInfo(info) {
+        if (!info) {
+          console.warn("No info object provided to displayObjectInfo");
+          return;
+        }
+
+        const infoPanel = document.getElementById("infoPanel");
+        if (!infoPanel) {
+          console.error("Info panel element not found");
+          return;
+        }
+
+        // Format number safely with fallback to 0
+        const formatNumber = (num) => {
+          return typeof num === "number" ? num.toLocaleString() : "0";
+        };
+
+        // Format decimal number safely with fallback to 0
+        const formatDecimal = (num, decimals = 2) => {
+          return typeof num === "number" ? num.toFixed(decimals) : "0.00";
+        };
+
+        const position = info.position || { x: 0, y: 0, z: 0 };
+
+        infoPanel.innerHTML = `
+          <div class="info-section">
+            <h3>Building Information</h3>
+            <div class="info-row">
+              <span>Name:</span>
+              <span>${info.name || "Unnamed"}</span>
+            </div>
+            <div class="info-row">
+              <span>Vertices:</span>
+              <span>${formatNumber(info.vertices)}</span>
+            </div>
+            <div class="info-row">
+              <span>Position:</span>
+              <span>(${formatDecimal(position.x)}, ${formatDecimal(
+          position.y
+        )}, ${formatDecimal(position.z)})</span>
+            </div>
+          </div>
+      
+          <div class="info-section">
+            <h3>Light Analysis</h3>
+            <div class="info-row">
+              <span>Fully Lit (>60%):</span>
+              <span>${info.fullyLitPercent || "0"}% (${formatNumber(
+          info.fullyLit
+        )} pixels)</span>
+            </div>
+            <div class="info-row">
+              <span>Partially Lit (30-60%):</span>
+              <span>${info.partiallyLitPercent || "0"}% (${formatNumber(
+          info.partiallyLit
+        )} pixels)</span>
+            </div>
+            <div class="info-row">
+              <span>Shadowed (<30%):</span>
+              <span>${info.shadowedPercent || "0"}% (${formatNumber(
+          info.shadowed
+        )} pixels)</span>
+            </div>
+          </div>
+      
+          <div class="info-section">
+            <h3>Area Analysis</h3>
+            <div class="info-row">
+              <span>Total Surface Area:</span>
+              <span>${formatDecimal(info.totalArea)} square meters</span>
+            </div>
+            <div class="info-row">
+              <span>Roof Area:</span>
+              <span>${formatDecimal(info.roofArea)} square meters</span>
+            </div>
+            <div class="info-row">
+              <span>Fully Lit Area:</span>
+              <span>${formatDecimal(info.fullyLitArea)} square meters</span>
+            </div>
+            <div class="info-row">
+              <span>Partially Lit Area:</span>
+              <span>${formatDecimal(info.partiallyLitArea)} square meters</span>
+            </div>
+            <div class="info-row">
+              <span>Shadowed Area:</span>
+              <span>${formatDecimal(info.shadowedArea)} square meters</span>
+            </div>
+          </div>
+      
+          <div class="info-section">
+            <h3>Solar Potential</h3>
+            <div class="info-row">
+              <span>BIPV Potential:</span>
+              <span>${formatDecimal(info.bipvPotential)} kWh/day</span>
+            </div>
+            <div class="info-row">
+              <span>Rooftop Solar Potential:</span>
+              <span>${formatDecimal(info.rooftopPotential)} kWh/day</span>
+            </div>
+            <div class="info-row">
+              <span>Total Solar Potential:</span>
+              <span>${formatDecimal(
+                (info.bipvPotential || 0) + (info.rooftopPotential || 0)
+              )} kWh/day</span>
+            </div>
+          </div>
+        `;
+      }
+
+      function AddPixelArray(pixelBuffer, currentArray) {
+        console.log("Incoming pixelBuffer:", pixelBuffer);
+        console.log("Current addArray:", currentArray);
+
+        if (!currentArray) {
+          // Initialize a new array with scaled values from pixelBuffer
+          const newArray = Array.from(pixelBuffer, (value) => 0);
+          console.log("Newly created addArray:", newArray);
+          return newArray;
+        } else {
+          // Accumulate values in a normal array
+          const resultArray = [];
+          for (let i = 0; i < currentArray.length; i++) {
+            resultArray[i] = currentArray[i] + pixelBuffer[i];
+          }
+          console.log("Resultant addArray:", resultArray);
+          return resultArray;
+        }
+      }
+
+      function DivideBy12(array) {
+        if (!array || !Array.isArray(array)) {
+          console.warn("Invalid array input");
+          return [];
+        }
+        return array.map((value) => Math.floor((value / 12) * 100) / 100);
+      }
+
+      async function simulateDay(latitude, longitude, date) {
+        if (!selectedObject?.isMesh) {
+          console.warn("Please select a valid building first");
+          return;
+        }
+
+        isSimulating = true;
+        simulationObject = selectedObject;
+        const results = [];
+        let globalIntensities = []; // Initialize as empty array
+
+        try {
+          for (let hour = 6; hour <= 18; hour++) {
+            const datetime = new Date(date);
+            datetime.setHours(hour);
+            updateSunPosition(latitude, longitude, datetime);
+
+            const hourResult = analyzeObject(simulationObject);
+            if (hourResult) {
+              results.push(hourResult);
+              // Add current intensities to global array
+              globalIntensities = globalIntensities.concat(
+                Array.from(hourResult.intensities || [])
+              );
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+
+          // Calculate average intensities
+          const averagedIntensities = DivideBy12(globalIntensities);
+
+          // Apply heatmap with averaged intensities
+          applyHeatmapToObject(selectedObject, averagedIntensities);
+
+          const averageResult = calculateAverageResults(results);
+          displayAverageResults(averageResult);
+
+          // After simulation completes, display graph
+          displaySimulationGraph(results);
+          displaySolarPotentialGraph(results);
+        } catch (error) {
+          console.error("Simulation failed:", error);
+        } finally {
+          setNoonPosition(latitude, longitude, date);
+          isSimulating = false;
+          simulationObject = null;
+        }
+      }
+
+      function calculateAverageResults(results) {
+        if (!results || !results.length) {
+          console.warn("No results to average");
+          return null;
+        }
+
+        const averageResult = {
+          fullyLitPercent: 0,
+          partiallyLitPercent: 0,
+          shadowedPercent: 0,
+          totalArea: 0,
+          roofArea: 0,
+          fullyLitArea: 0,
+          partiallyLitArea: 0,
+          shadowedArea: 0,
+          bipvPotential: 0,
+          rooftopPotential: 0,
+        };
+
+        // Sum all values
+        results.forEach((result) => {
+          const totalArea =
+            (result.fullyLitArea || 0) +
+            (result.partiallyLitArea || 0) +
+            (result.shadowedArea || 0);
+
+          // Calculate percentages for this result
+          const fullyLitPercent =
+            totalArea > 0 ? ((result.fullyLitArea || 0) / totalArea) * 100 : 0;
+          const partiallyLitPercent =
+            totalArea > 0
+              ? ((result.partiallyLitArea || 0) / totalArea) * 100
+              : 0;
+          const shadowedPercent =
+            totalArea > 0 ? ((result.shadowedArea || 0) / totalArea) * 100 : 0;
+
+          averageResult.fullyLitPercent += fullyLitPercent;
+          averageResult.partiallyLitPercent += partiallyLitPercent;
+          averageResult.shadowedPercent += shadowedPercent;
+          averageResult.totalArea += totalArea;
+          averageResult.roofArea += result.roofArea || 0;
+          averageResult.fullyLitArea += result.fullyLitArea || 0;
+          averageResult.partiallyLitArea += result.partiallyLitArea || 0;
+          averageResult.shadowedArea += result.shadowedArea || 0;
+          averageResult.bipvPotential += result.bipvPotential || 0;
+          averageResult.rooftopPotential += result.rooftopPotential || 0;
+        });
+
+        // Calculate averages
+        const count = results.length;
+        for (let key in averageResult) {
+          averageResult[key] = averageResult[key] / count;
+        }
+
+        return averageResult;
+      }
+
+      function displayAverageResults(averageResult) {
+        const infoPanel = document.getElementById("infoPanel");
+        infoPanel.innerHTML += `
+          <br><strong>Average Results</strong><br>
+          Fully Lit (>60%): ${averageResult.fullyLitPercent.toFixed(1)}%<br>
+          Partially Lit (30-60%): ${averageResult.partiallyLitPercent.toFixed(
+            1
+          )}%<br>
+          Shadowed (<30%): ${averageResult.shadowedPercent.toFixed(1)}%<br>
+          Total Surface Area: ${averageResult.totalArea.toFixed(
+            2
+          )} square meters<br>
+          Roof Area: ${averageResult.roofArea.toFixed(2)} square meters<br>
+          Fully Lit Area: ${averageResult.fullyLitArea.toFixed(
+            2
+          )} square meters<br>
+          Partially Lit Area: ${averageResult.partiallyLitArea.toFixed(
+            2
+          )} square meters<br>
+          Shadowed Area: ${averageResult.shadowedArea.toFixed(
+            2
+          )} square meters<br>
+          Verticle Surface Potential: ${averageResult.bipvPotential.toFixed(
+            2
+          )} kWh/day<br>
+          Rooftop Solar Potential: ${averageResult.rooftopPotential.toFixed(
+            2
+          )} kWh/day<br>
+          Total Solar Potential: ${(
+            averageResult.bipvPotential + averageResult.rooftopPotential
+          ).toFixed(2)} kWh/day
+        `;
+      }
+
+      function calculateMeshLighting(mesh) {
+        // Use a simple approximation based on mesh normals and sun direction
+        const sunDir = sunLight.position.clone().normalize();
+        const normalMatrix = new THREE.Matrix3().getNormalMatrix(
+          mesh.matrixWorld
+        );
+
+        let totalIntensity = 0;
+        const normals = mesh.geometry.attributes.normal;
+        for (let i = 0; i < normals.count; i++) {
+          const normal = new THREE.Vector3(
+            normals.getX(i),
+            normals.getY(i),
+            normals.getZ(i)
+          );
+          normal.applyMatrix3(normalMatrix).normalize();
+          const intensity = Math.max(normal.dot(sunDir), 0);
+          totalIntensity += intensity;
+        }
+
+        // Return average intensity
+        return totalIntensity / normals.count;
+      }
+
+      function applyHeatmap(meshLightingData) {
+        // Determine min and max intensities
+        let minIntensity = Infinity;
+        let maxIntensity = -Infinity;
+        meshLightingData.forEach((intensity) => {
+          if (intensity < minIntensity) minIntensity = intensity;
+          if (intensity > maxIntensity) maxIntensity = intensity;
+        });
+
+        // Apply color to each mesh based on accumulated intensity
+        meshLightingData.forEach((intensity, mesh) => {
+          // Normalize intensity
+          const normalizedIntensity =
+            (intensity - minIntensity) / (maxIntensity - minIntensity);
+
+          // Map normalized intensity to color from blue (low) to red (high)
+          const hue = ((1 - normalizedIntensity) * 240) / 360; // Map intensity from blue (240°) to red (0°)
+          const color = new THREE.Color().setHSL(hue, 1, 0.5);
+
+          // Apply color to mesh
+          mesh.material = new THREE.MeshBasicMaterial({ color: color });
+        });
+      }
+
+      function startSimulation() {
+        const latitude =
+          parseFloat(document.getElementById("latInput").value) ||
+          AHMEDABAD_LAT;
+        const longitude =
+          parseFloat(document.getElementById("longInput").value) ||
+          AHMEDABAD_LONG;
+        const dateInput = document.getElementById("timeInput").value;
+        const date = new Date(dateInput);
+
+        simulateDay(latitude, longitude, date);
+      }
+
+      // Event listeners
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      function onMouseMove(event) {
+        event.preventDefault();
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(
+          [...objects.values()],
+          true
+        );
+
+        document.body.style.cursor =
+          intersects.length > 0 ? "pointer" : "default";
+      }
+
+      function onClick(event) {
+        if (isSimulating) {
+          console.log("Simulation in progress - selection locked");
+          return;
+        }
+
+        event.preventDefault();
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(
+          [...objects.values()],
+          true
+        );
+
+        // Only reset if not simulating
+        if (selectedObject && !isSimulating) {
+          const originalMaterial = originalMaterials.get(selectedObject);
+          if (originalMaterial) {
+            selectedObject.material = originalMaterial;
+          }
+          selectedObject = null;
+        }
+
+        if (intersects.length > 0) {
+          const mesh = intersects[0].object;
+          if (mesh.isMesh) {
+            selectedObject = mesh;
+            if (!originalMaterials.has(selectedObject)) {
+              originalMaterials.set(
+                selectedObject,
+                selectedObject.material.clone()
+              );
+            }
+            selectedObject.material = highlightMaterial;
+            const info = analyzeObject(selectedObject);
+            if (info) {
+              displayObjectInfo(info);
+            }
+          }
+        }
+      }
+
+      window.addEventListener("click", onClick);
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Load model
+      const objLoader = new THREE.OBJLoader();
+      objLoader.load(
+        "ahm3d_obj.obj",
+        (object) => {
+          let objectCount = 0;
+          object.traverse((child) => {
+            if (child.isMesh) {
+              // Validate and fix geometry
+              if (!child.geometry.attributes.normal) {
+                child.geometry.computeVertexNormals();
+              }
+              if (!child.geometry.index) {
+                console.warn("Converting non-indexed geometry to indexed");
+                child.geometry = THREE.BufferGeometryUtils.mergeVertices(
+                  child.geometry
+                );
+              }
+
+              child.castShadow = true;
+              child.receiveShadow = true;
+              child.name = child.name || `Object_${objectCount++}`;
+
+              const boundingBox = new THREE.Box3().setFromObject(child);
+              const objectHeight = boundingBox.max.y - boundingBox.min.y;
+              child.position.y = objectHeight / 1000;
+
+              objects.set(child.name, child);
+              originalMaterials.set(child, child.material.clone());
+            }
+          });
+          scene.add(object);
+          console.log(`Total objects loaded: ${objects.size}`);
+        },
+        undefined,
+        (error) => console.error("An error happened", error)
+      );
+
+      const now = new Date();
+      document.getElementById("timeInput").value = now
+        .toISOString()
+        .slice(0, 16);
+      document.getElementById("latInput").value = AHMEDABAD_LAT;
+      document.getElementById("longInput").value = AHMEDABAD_LONG;
+      document.getElementById("ghiInput").value = DEFAULT_GHI;
+
+      // Initial sun position update
+      updateSunPosition(AHMEDABAD_LAT, AHMEDABAD_LONG, now);
+
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+        updateCamera();
+        controls.update();
+        skyDome.position.copy(camera.position);
+        renderer.render(scene, camera);
+      }
+
+      // Function to calculate average pixel color
+      function calculateAveragePixelColor() {
+        // Create a temporary 2D canvas
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = renderer.domElement.width;
+        tempCanvas.height = renderer.domElement.height;
+        const context = tempCanvas.getContext("2d");
+
+        // Draw WebGL canvas content to the temporary canvas
+        context.drawImage(renderer.domElement, 0, 0);
+
+        try {
+          const imageData = context.getImageData(
+            0,
+            0,
+            tempCanvas.width,
+            tempCanvas.height
+          );
+          const data = imageData.data;
+          let r = 0,
+            g = 0,
+            b = 0;
+          let pixelCount = 0;
+
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 0) {
+              // Only count non-transparent pixels
+              r += data[i];
+              g += data[i + 1];
+              b += data[i + 2];
+              pixelCount++;
+            }
+          }
+
+          if (pixelCount > 0) {
+            r = Math.floor(r / pixelCount);
+            g = Math.floor(g / pixelCount);
+            b = Math.floor(b / pixelCount);
+          }
+
+          return { r, g, b };
+        } catch (error) {
+          console.error("Error calculating average color:", error);
+          return { r: 0, g: 0, b: 0 };
+        } finally {
+          // Clean up
+          tempCanvas.remove();
+        }
+      }
+
+      // Function to display average pixel color and other info
+      function displaySimulationInfo() {
+        try {
+          const avgColor = calculateAveragePixelColor();
+          const infoPanel = document.getElementById("infoPanel");
+          const now = new Date();
+
+          const info = `
+                <strong>Simulation Information</strong><br>
+                Average Scene Color: RGB(${avgColor.r}, ${avgColor.g}, ${
+            avgColor.b
+          })<br>
+                Latitude: ${AHMEDABAD_LAT}°<br>
+                Longitude: ${AHMEDABAD_LONG}°<br>
+                GHI: ${DEFAULT_GHI} kWh/m²/day<br>
+                Time: ${now.toLocaleString()}<br>
+            `;
+
+          if (infoPanel) {
+            infoPanel.innerHTML += info;
+          }
+        } catch (error) {
+          console.error("Error displaying simulation info:", error);
+        }
+      }
+
+      // Call displaySimulationInfo after the scene has been rendered
+      function updateSimulationInfo() {
+        // Wait for next frame to ensure scene is rendered
+        requestAnimationFrame(() => {
+          displaySimulationInfo();
+        });
+      }
+
+      // Start animation and trigger initial simulation info display
+      animate();
+      updateSimulationInfo();
+
+      // Add event listeners
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("click", onClick);
+
+      // Add this new function
+      function setNoonPosition(latitude, longitude, date) {
+        const noonTime = new Date(date);
+        noonTime.setHours(12, 0, 0, 0);
+
+        // Update sun position
+        updateSunPosition(latitude, longitude, noonTime);
+
+        // Update time input display
+        document.getElementById("timeInput").value = noonTime
+          .toISOString()
+          .slice(0, 16);
+      }
+
+      // Add keyboard event listeners
+      window.addEventListener(
+        "keydown",
+        (e) => (keys[e.key.toLowerCase()] = true)
+      );
+      window.addEventListener(
+        "keyup",
+        (e) => (keys[e.key.toLowerCase()] = false)
+      );
+
+      // Add this function for camera movement
+      function updateCamera() {
+        // Get forward and right vectors from camera
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyQuaternion(camera.quaternion);
+        forward.y = 0; // Keep movement horizontal
+        forward.normalize();
+
+        const right = new THREE.Vector3(1, 0, 0);
+        right.applyQuaternion(camera.quaternion);
+        right.y = 0; // Keep movement horizontal
+        right.normalize();
+
+        // WASD movement
+        if (keys["w"]) {
+          camera.position.addScaledVector(forward, MOVEMENT_SPEED);
+        }
+        if (keys["s"]) {
+          camera.position.addScaledVector(forward, -MOVEMENT_SPEED);
+        }
+        if (keys["a"]) {
+          camera.position.addScaledVector(right, -MOVEMENT_SPEED);
+        }
+        if (keys["d"]) {
+          camera.position.addScaledVector(right, MOVEMENT_SPEED);
+        }
+
+        // Q/E for up/down
+        if (keys["q"]) {
+          camera.position.y -= MOVEMENT_SPEED;
+        }
+        if (keys["e"]) {
+          camera.position.y += MOVEMENT_SPEED;
+        }
+
+        // Enforce minimum height
+        camera.position.y = Math.max(camera.position.y, 1);
+
+        // Update controls target to match camera movement
+        controls.target.copy(camera.position).add(forward);
+      }
+
+      function applyHeatmapToObject(object, intensities) {
+        if (!object?.isMesh || !intensities?.length) {
+          console.warn("Invalid input for heatmap");
+          return;
+        }
+
+        const geometry = object.geometry;
+        if (!geometry?.attributes?.position || !geometry?.index) {
+          console.warn("Invalid geometry for heatmap");
+          return;
+        }
+
+        const colors = new Float32Array(geometry.attributes.position.count * 3);
+        const triangleCount = geometry.index.count / 3;
+
+        const minIntensity = Math.min(...intensities);
+        const maxIntensity = Math.max(...intensities);
+        const range = maxIntensity - minIntensity;
+
+        // Define fixed thresholds for better distribution
+        const thresholds = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.85, 1.0];
+        const heatmapColors = [
+          new THREE.Color("#313695"), // Deep blue
+          new THREE.Color("#4575b4"), // Blue
+          new THREE.Color("#74add1"), // Light blue
+          new THREE.Color("#abd9e9"), // Very light blue
+          new THREE.Color("#fee090"), // Light yellow
+          new THREE.Color("#fdae61"), // Orange
+          new THREE.Color("#f46d43"), // Dark orange
+          new THREE.Color("#d73027"), // Red
+        ].reverse();
+
+        for (let i = 0; i < triangleCount; i++) {
+          const normalizedIntensity =
+            range > 0 ? (intensities[i] - minIntensity) / range : 0;
+
+          // Find appropriate color segment
+          let colorIndex =
+            thresholds.findIndex((t) => normalizedIntensity <= t) - 1;
+          if (colorIndex === -2) colorIndex = thresholds.length - 2;
+          if (colorIndex < 0) colorIndex = 0;
+
+          // Calculate interpolation within segment
+          const segmentStart = thresholds[colorIndex];
+          const segmentEnd = thresholds[colorIndex + 1];
+          const segmentPos =
+            (normalizedIntensity - segmentStart) / (segmentEnd - segmentStart);
+
+          // Interpolate between colors
+          const colorA = heatmapColors[colorIndex];
+          const colorB = heatmapColors[colorIndex + 1];
+          const color = new THREE.Color().copy(colorA).lerp(colorB, segmentPos);
+
+          const i3 = i * 3;
+          [0, 1, 2].forEach((j) => {
+            const vertex = geometry.index.getX(i3 + j);
+            colors[vertex * 3] = color.r;
+            colors[vertex * 3 + 1] = color.g;
+            colors[vertex * 3 + 2] = color.b;
+          });
+        }
+
+        geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+        object.material = new THREE.MeshPhongMaterial({
+          vertexColors: true,
+          shininess: 0,
+          flatShading: true,
+        });
+
+        // Update legend
+        const legendHTML = `
+            <div class="heatmap-legend">
+                <div class="legend-title">Solar Irradiance</div>
+                <div class="heatmap-gradient" style="background: linear-gradient(
+                    to right,
+                    #313695,
+                    #4575b4,
+                    #74add1,
+                    #abd9e9,
+                    #fee090,
+                    #fdae61,
+                    #f46d43,
+                    #d73027
+                );"></div>
+                <div class="heatmap-labels">
+                    <span>Low</span>
+                    <span>Medium</span>
+                    <span>High</span>
+                </div>
+            </div>
+        `;
+
+        const existingLegend = document.querySelector(".heatmap-legend");
+        if (existingLegend) {
+          existingLegend.remove();
+        }
+        document.body.insertAdjacentHTML("beforeend", legendHTML);
+      }
+
+      function calculateTriangleArea(a, b, c) {
+        // Check if valid vectors are provided
+        if (!a || !b || !c) {
+          console.warn("Invalid vertices for triangle area calculation");
+          return 0;
+        }
+
+        // Calculate two edges of the triangle
+        const edge1 = new THREE.Vector3().subVectors(b, a);
+        const edge2 = new THREE.Vector3().subVectors(c, a);
+
+        // Calculate area using cross product
+        const crossProduct = new THREE.Vector3().crossVectors(edge1, edge2);
+
+        // Area is half the magnitude of the cross product
+        return crossProduct.length() * 0.5;
+      }
+
+      function calculateIntensity(normal, sunDir) {
+        const cosTheta = normal.dot(sunDir);
+
+        // Give higher weight to upward-facing surfaces (rooftops)
+        const roofFactor = Math.max(normal.y, 0); // Gets stronger for surfaces facing up
+
+        // Adjusted for India's latitude (~23°N)
+        const altitude = Math.asin(sunDir.y);
+        const airMass =
+          1 /
+          (Math.sin(altitude) +
+            0.50572 * Math.pow(6.07995 + altitude, -1.6364));
+
+        // Adjusted coefficient for clearer skies
+        const atmosphericTransmission = Math.exp(-0.05 * airMass);
+
+        // Combine factors, giving extra weight to rooftops
+        return Math.max(
+          cosTheta * atmosphericTransmission * (1 + roofFactor),
+          0
+        );
+      }
+
+      function addHeatmapLegendStyles() {
+        const style = document.createElement("style");
+        style.textContent = `
+        .heatmap-legend {
+          display: flex;
+          flex-direction: column;
+          margin-top: 10px;
+          padding: 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+        }
+        .heatmap-gradient {
+          height: 20px;
+          width: 100%;
+          background: linear-gradient(to right,
+            #313695, /* Deep blue */
+            #4575b4, /* Blue */
+            #74add1, /* Light blue */
+            #abd9e9, /* Very light blue */
+            #fee090, /* Light yellow */
+            #fdae61, /* Orange */
+            #f46d43, /* Dark orange */
+            #d73027  /* Red */
+          );
+          margin: 5px 0;
+        }
+        .heatmap-labels {
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+        }
+      `;
+        document.head.appendChild(style);
+      }
+
+      // Call this when the page loads
+      addHeatmapLegendStyles();
+
+      function displaySimulationGraph(results) {
+        // Remove existing chart if any
+        const existingChart = document.querySelector(".chart-container");
+        if (existingChart) {
+          existingChart.remove();
+        }
+
+        // Create chart container
+        const chartContainer = document.createElement("div");
+        chartContainer.className = "chart-container";
+        chartContainer.innerHTML = `
+        <div class="chart-title">Solar Exposure Analysis</div>
+        <canvas id="lightingChart"></canvas>
+    `;
+        document.body.appendChild(chartContainer);
+
+        // Prepare data
+        const times = results.map((_, index) => index + 6);
+        const fullyLitData = results.map((r) => r.fullyLitArea);
+        const partiallyLitData = results.map((r) => r.partiallyLitArea);
+        const shadowedData = results.map((r) => r.shadowedArea);
+
+        // Create chart
+        const ctx = document.getElementById("lightingChart").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: times.map((t) => `${t}:00`),
+            datasets: [
+              {
+                label: "Fully Lit Area",
+                data: fullyLitData,
+                borderColor: "#4caf50",
+                backgroundColor: "rgba(76, 175, 80, 0.1)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+              },
+              {
+                label: "Partially Lit Area",
+                data: partiallyLitData,
+                borderColor: "#ffc107",
+                backgroundColor: "rgba(255, 193, 7, 0.1)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+              },
+              {
+                label: "Shadowed Area",
+                data: shadowedData,
+                borderColor: "#607d8b",
+                backgroundColor: "rgba(96, 125, 139, 0.1)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              intersect: false,
+              mode: "index",
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: "Surface Area Lighting Distribution Over Time",
+                font: {
+                  size: 16,
+                },
+              },
+              legend: {
+                position: "top",
+              },
+              tooltip: {
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                titleColor: "#333",
+                bodyColor: "#333",
+                borderColor: "#ddd",
+                borderWidth: 1,
+                padding: 10,
+                displayColors: true,
+                callbacks: {
+                  label: (context) => {
+                    return `${
+                      context.dataset.label
+                    }: ${context.parsed.y.toFixed(2)} m²`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: "Time of Day",
+                  font: {
+                    weight: "bold",
+                  },
+                },
+                grid: {
+                  display: false,
+                },
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: "Surface Area (m²)",
+                  font: {
+                    weight: "bold",
+                  },
+                },
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }
+
+      function displaySolarPotentialGraph(results) {
+        // Remove existing chart if any
+        const existingChart = document.querySelector(".solar-chart-container");
+        if (existingChart) {
+          existingChart.remove();
+        }
+
+        // Create chart container
+        const chartContainer = document.createElement("div");
+        chartContainer.className = "solar-chart-container";
+        chartContainer.innerHTML = `
+        <div class="chart-title">Solar Power Generation Potential</div>
+        <canvas id="solarChart"></canvas>
+    `;
+        document.body.appendChild(chartContainer);
+
+        // Prepare data
+        const times = results.map((_, index) => index + 6);
+        const bipvData = results.map((r) => r.bipvPotential);
+        const rooftopData = results.map((r) => r.rooftopPotential);
+        const totalData = results.map(
+          (r) => r.bipvPotential + r.rooftopPotential
+        );
+
+        // Create chart
+        const ctx = document.getElementById("solarChart").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: times.map((t) => `${t}:00`),
+            datasets: [
+              {
+                label: "BIPV Potential",
+                data: bipvData,
+                borderColor: "#2196f3",
+                backgroundColor: "rgba(33, 150, 243, 0.1)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+              },
+              {
+                label: "Rooftop Solar Potential",
+                data: rooftopData,
+                borderColor: "#9c27b0",
+                backgroundColor: "rgba(156, 39, 176, 0.1)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+              },
+              {
+                label: "Total Solar Potential",
+                data: totalData,
+                borderColor: "#ff9800",
+                backgroundColor: "rgba(255, 152, 0, 0.1)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              intersect: false,
+              mode: "index",
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: "Solar Power Generation Potential Over Time",
+                font: {
+                  size: 16,
+                },
+              },
+              legend: {
+                position: "top",
+              },
+              tooltip: {
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                titleColor: "#333",
+                bodyColor: "#333",
+                borderColor: "#ddd",
+                borderWidth: 1,
+                padding: 10,
+                displayColors: true,
+                callbacks: {
+                  label: (context) => {
+                    return `${
+                      context.dataset.label
+                    }: ${context.parsed.y.toFixed(2)} kWh/day`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: "Time of Day",
+                  font: {
+                    weight: "bold",
+                  },
+                },
+                grid: {
+                  display: false,
+                },
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: "Power Generation (kWh/day)",
+                  font: {
+                    weight: "bold",
+                  },
+                },
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }
+
+      // Add CSS for new chart
+      const style = document.createElement("style");
+      style.textContent = `
+.solar-chart-container {
+    position: absolute;
+    bottom: 20px;
+    left: 640px;
+    background: var(--panel-bg);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    width: 600px;
+    z-index: 1000;
+}
+
+canvas#solarChart {
+    width: 100% !important;
+    height: 300px !important;
+    margin: 0;
+}
+`;
+      document.head.appendChild(style);
+    </script>
+  </body>
+</html>
