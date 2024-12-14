@@ -4,7 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
   <title>Three.js Building Analysis with BIPV and Rooftop Solar</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     :root {
       --primary-color: #2196f3;
@@ -83,7 +86,7 @@
     }
 
     .info-panel {
-      position: absolute;
+      position: fixed;
       top: 100px;
       right: 10px;
       background: var(--panel-bg);
@@ -93,7 +96,7 @@
       z-index: 100;
       max-height: 80vh;
       overflow-y: auto;
-      width: 350px;
+      width: 550px;
     }
 
     .info-section {
@@ -131,6 +134,22 @@
     .shadowed {
       background-color: var(--shadow-color);
     }
+
+    .facadeChart {
+    position: absolute;
+    background: var(--panel-bg);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    width: 600px;
+    z-index: 1000;
+}
+
+canvas#facadeBIPVchart {
+    width: 100% !important;
+    height: 300px !important;
+    margin: 0;
+}
 
     /* Scrollbar styling */
     ::-webkit-scrollbar {
@@ -188,7 +207,7 @@
       border-radius: 4px;
       position: absolute;
       bottom: 20px;
-      right: 20px;
+      left: 20px;
       background: var(--panel-bg);
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
       width: 250px;
@@ -227,16 +246,22 @@
       color: var(--text-color);
     }
 
+    .facadeChart{
+      background: var(--panel-bg);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      width: 600px;
+      z-index: 1000;
+    }
+
     .solar-chart-container {
-    position: absolute;
-    /* top: 500px; */
-    left: 5px;
-    background: var(--panel-bg);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    width: 500  px;
-    z-index: 1000;
+      background: var(--panel-bg);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      width: 600px;
+      z-index: 1000;
 }
 
 canvas#solarChart {
@@ -246,9 +271,6 @@ canvas#solarChart {
 }
 
     .chart-container {
-      position: absolute;
-      top: 50px;
-      left: 5px;
       background: var(--panel-bg);
       padding: 20px;
       border-radius: 8px;
@@ -271,14 +293,16 @@ canvas#solarChart {
       height: 300px !important;
       margin: 0;
     }
+    .modal{
+      z-index: 100000;
+    }
   </style>
 </head>
-
 <body>
   <div class="controls">
     <div class="control-group">
       <label for="timeInput" data-tooltip="Select date and time">Date & Time</label>
-      <input type="datetime-local" id="timeInput" />
+      <input type="text" id="timeInput" />
     </div>
 
     <div class="control-group">
@@ -296,30 +320,49 @@ canvas#solarChart {
       <input type="number" id="ghiInput" step="0.01" />
     </div>
 
-    <button onclick="updateFromInputs()" data-tooltip="Update sun position based on inputs">
+    <button onclick="updateFromInputs()">
       Update Sun Position
     </button>
     &nbsp;
-    <button onclick="startSimulation()" data-tooltip="Run full day simulation">
+    <button onclick="startSimulation()">
       Start Day Simulation
-    </button>
+    </button> 
   </div>
-  <div id="infoPanel" class="info-panel"></div>
-
+  <div id="infoPanel" class="info-panel"><button onclick="printInfoPanel()">Print</button>
+</div>
+  
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/OBJLoader.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/utils/BufferGeometryUtils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script>
+    flatpickr("#timeInput", {
+      enableTime: true,
+      dateFormat: "Y-m-d H:i",
+    });
+    function printInfoPanel() {
+    var content = document.getElementById('infoPanel').innerHTML;
+    var originalContent = document.body.innerHTML;
+
+    document.body.innerHTML = content;
+    window.print();
+
+    // Restore original content after printing
+    document.body.innerHTML = originalContent;
+    window.location.reload();  // Optional: Reload the page to restore DOM state
+}
+
+    const GHI_VALS = [3.5, 3.6, 3.7, 3.8, 4.4, 5.0, 5.5, 5.0, 4.4, 3.8, 3.2, 2.0];
     let globalAddArray = null;
     // Constants
     const AHMEDABAD_LAT = 23.0225;
     const AHMEDABAD_LONG = 72.5714;
     const DEFAULT_GHI = 5.5; // Default GHI value for Ahmedabad
     const MIN_HEIGHT = 1; // Minimum height above ground
-    const MOVEMENT_SPEED = 2;
+    const MOVEMENT_SPEED = 5;
     let keys = {};
 
     // Scene setup
@@ -490,133 +533,187 @@ canvas#solarChart {
       updateSunPosition(lat, long, datetime);
     }
 
-    function analyzeObject(object) {
-      if (!object?.isMesh) return null;
+    function analyzeObject(object, ghi_index) {
+  if (!object?.isMesh) return null;
 
-      const geometry = object.geometry;
-      if (
-        !geometry?.attributes?.position ||
-        !geometry?.attributes?.normal ||
-        !geometry?.index
-      )
-        return null;
+  const geometry = object.geometry;
+  if (
+    !geometry?.attributes?.position ||
+    !geometry?.attributes?.normal ||
+    !geometry?.index
+  )
+    return null;
 
-      const sunDir = sunLight.position.clone().normalize();
-      const normalMatrix = new THREE.Matrix3().getNormalMatrix(
-        object.matrixWorld
-      );
+  const sunDir = sunLight.position.clone().normalize();
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(
+    object.matrixWorld
+  );
 
-      let totalArea = 0;
-      let roofArea = 0;
-      let fullyLitArea = 0;
-      let partiallyLitArea = 0;
-      let shadowedArea = 0;
+  let totalArea = 0;
+  let roofArea = 0;
+  let fullyLitArea = 0;
+  let partiallyLitArea = 0;
+  let shadowedArea = 0;
+  
+  // New variables for face-specific calculations
+  let NBipv = 0, SBipv = 0, EBipv = 0, WBipv = 0;
+  let NA = 0, SA = 0, EA = 0, WA = 0;
+  
+  const position = geometry.attributes.position;
+  const normalAttr = geometry.attributes.normal;
+  const index = geometry.index;
+  const triangleCount = index.count / 3;
 
-      const position = geometry.attributes.position;
-      const normalAttr = geometry.attributes.normal;
-      const index = geometry.index;
-      const triangleCount = index.count / 3;
+  const intensities = new Float32Array(triangleCount);
 
-      const intensities = new Float32Array(triangleCount);
+  const ghi = GHI_VALS[ghi_index] || DEFAULT_GHI;
+  const pvEfficiency = 0.2;
+  const performanceRatio = 0.75;
+  const verticalEfficiency = 0.7;
 
-      for (let i = 0; i < triangleCount; i++) {
-        const i3 = i * 3;
-        const ai = index.getX(i3);
-        const bi = index.getX(i3 + 1);
-        const ci = index.getX(i3 + 2);
+  for (let i = 0; i < triangleCount; i++) {
+    const i3 = i * 3;
+    const ai = index.getX(i3);
+    const bi = index.getX(i3 + 1);
+    const ci = index.getX(i3 + 2);
 
-        const a = new THREE.Vector3().fromBufferAttribute(position, ai);
-        const b = new THREE.Vector3().fromBufferAttribute(position, bi);
-        const c = new THREE.Vector3().fromBufferAttribute(position, ci);
+    const a = new THREE.Vector3().fromBufferAttribute(position, ai);
+    const b = new THREE.Vector3().fromBufferAttribute(position, bi);
+    const c = new THREE.Vector3().fromBufferAttribute(position, ci);
 
-        const normal = new THREE.Vector3()
-          .fromBufferAttribute(normalAttr, ai)
-          .applyMatrix3(normalMatrix)
-          .normalize();
+    const normal = new THREE.Vector3()
+      .fromBufferAttribute(normalAttr, ai)
+      .applyMatrix3(normalMatrix)
+      .normalize();
 
-        // Skip bottom surfaces (facing downward)
-        if (normal.y < -0.7) {
-          intensities[i] = 0; // Set intensity to 0 for bottom surfaces
-          continue; // Skip area calculations for bottom surfaces
-        }
+    // Skip bottom surfaces (facing downward)
+    if (normal.y < -0.7) {
+      intensities[i] = 0; // Set intensity to 0 for bottom surfaces
+      continue; // Skip area calculations for bottom surfaces
+    }
 
-        const area = Math.floor(calculateTriangleArea(a, b, c) * 100) / 100;
+    const area = Math.floor(calculateTriangleArea(a, b, c) * 100) / 100;
 
-        // Only add to total area if not a bottom surface
-        totalArea += area;
+    // Only add to total area if not a bottom surface
+    totalArea += area;
 
-        // Calculate intensity for non-bottom surfaces
-        const intensity = calculateIntensity(normal, sunDir);
-        intensities[i] = intensity;
+    // Calculate intensity for non-bottom surfaces
+    const intensity = calculateIntensity(normal, sunDir);
+    intensities[i] = intensity;
 
-        // Identify roof surfaces (facing upward)
-        if (normal.y > 0.7) {
-          roofArea += area;
-        }
-
-        // Categorize lighting based on intensity
-        if (intensity > 0.6) {
-          fullyLitArea += area;
-        } else if (intensity > 0.3) {
-          partiallyLitArea += area;
+    // Identify roof surfaces (facing upward)
+    if (normal.y > 0.7) {
+      roofArea += area;
+    } else {
+      // For vertical surfaces, determine which face they belong to
+      const absX = Math.abs(normal.x);
+      const absZ = Math.abs(normal.z);
+      
+      if (absX > absZ) {
+        // East or West face
+        if (normal.x > 0) {
+          EA += area;
+          if (intensity > 0.3) {
+            EBipv += area * intensity * ghi * pvEfficiency * performanceRatio * verticalEfficiency;
+          }
         } else {
-          shadowedArea += area;
+          WA += area;
+          if (intensity > 0.3) {
+            WBipv += area * intensity * ghi * pvEfficiency * performanceRatio * verticalEfficiency;
+          }
+        }
+      } else {
+        // North or South face
+        if (normal.z > 0) {
+          SA += area;
+          if (intensity > 0.3) {
+            SBipv += area * intensity * ghi * pvEfficiency * performanceRatio * verticalEfficiency;
+          }
+        } else {
+          NA += area;
+          if (intensity > 0.3) {
+            NBipv += area * intensity * ghi * pvEfficiency * performanceRatio * verticalEfficiency;
+          }
         }
       }
-
-      const ghi =
-        parseFloat(document.getElementById("ghiInput").value) || DEFAULT_GHI;
-      const pvEfficiency = 0.2;
-      const performanceRatio = 0.75;
-
-      // Calculate vertical area (total area minus roof area, bottom surfaces already excluded)
-      const verticalArea = totalArea - roofArea;
-      const verticalEfficiency = 0.7;
-      const bipvPotential =
-        Math.floor(
-          fullyLitArea *
-          ghi *
-          pvEfficiency *
-          performanceRatio *
-          verticalEfficiency *
-          100
-        ) / 100;
-
-      const roofEfficiency = 0.9;
-      const rooftopPotential =
-        Math.floor(
-          roofArea *
-          ghi *
-          pvEfficiency *
-          performanceRatio *
-          roofEfficiency *
-          100
-        ) / 100;
-
-      const totalLitArea = fullyLitArea + partiallyLitArea + shadowedArea;
-
-      return {
-        name: object.name || `Unnamed (${object.id})`,
-        vertices: geometry.attributes.position.count,
-        position: object.position,
-        totalArea: Math.floor(totalArea * 100) / 100,
-        roofArea: Math.floor(roofArea * 100) / 100,
-        fullyLitArea: Math.floor(fullyLitArea * 100) / 100,
-        partiallyLitArea: Math.floor(partiallyLitArea * 100) / 100,
-        shadowedArea: Math.floor(shadowedArea * 100) / 100,
-        fullyLitPercent:
-          Math.floor((fullyLitArea / totalLitArea) * 100 * 100) / 100,
-        partiallyLitPercent:
-          Math.floor((partiallyLitArea / totalLitArea) * 100 * 100) / 100,
-        shadowedPercent:
-          Math.floor((shadowedArea / totalLitArea) * 100 * 100) / 100,
-        bipvPotential,
-        rooftopPotential,
-        totalPotential:
-          Math.floor((bipvPotential + rooftopPotential) * 100) / 100,
-        intensities,
-      };
     }
+
+    // Categorize lighting based on intensity
+    if (intensity > 0.6) {
+      fullyLitArea += area;
+    } else if (intensity > 0.3) {
+      partiallyLitArea += area;
+    } else {
+      shadowedArea += area;
+    }
+  }
+
+  // Calculate vertical area (total area minus roof area, bottom surfaces already excluded)
+  const verticalArea = totalArea - roofArea;
+  const bipvPotential =
+    Math.floor(
+      fullyLitArea *
+      ghi *
+      pvEfficiency *
+      performanceRatio *
+      verticalEfficiency *
+      100
+    ) / 100;
+
+  const roofEfficiency = 0.9;
+  const rooftopPotential =
+    Math.floor(
+      roofArea *
+      ghi *
+      pvEfficiency *
+      performanceRatio *
+      roofEfficiency *
+      100
+    ) / 100;
+
+  const totalLitArea = fullyLitArea + partiallyLitArea + shadowedArea;
+
+  // Round the new values
+  NBipv = Math.floor(NBipv * 100) / 100;
+  SBipv = Math.floor(SBipv * 100) / 100;
+  EBipv = Math.floor(EBipv * 100) / 100;
+  WBipv = Math.floor(WBipv * 100) / 100;
+  NA = Math.floor(NA * 100) / 100;
+  SA = Math.floor(SA * 100) / 100;
+  EA = Math.floor(EA * 100) / 100;
+  WA = Math.floor(WA * 100) / 100;
+
+  return {
+    name: object.name || `Unnamed (${object.id})`,
+    vertices: geometry.attributes.position.count,
+    position: object.position,
+    totalArea: Math.floor(totalArea * 100) / 100,
+    roofArea: Math.floor(roofArea * 100) / 100,
+    fullyLitArea: Math.floor(fullyLitArea * 100) / 100,
+    partiallyLitArea: Math.floor(partiallyLitArea * 100) / 100,
+    shadowedArea: Math.floor(shadowedArea * 100) / 100,
+    fullyLitPercent:
+      Math.floor((fullyLitArea / totalLitArea) * 100 * 100) / 100,
+    partiallyLitPercent:
+      Math.floor((partiallyLitArea / totalLitArea) * 100 * 100) / 100,
+    shadowedPercent:
+      Math.floor((shadowedArea / totalLitArea) * 100 * 100) / 100,
+    bipvPotential,
+    rooftopPotential,
+    totalPotential:
+      Math.floor((bipvPotential + rooftopPotential) * 100) / 100,
+    intensities,
+    // New values
+    NBipv,
+    SBipv,
+    EBipv,
+    WBipv,
+    NA,
+    SA,
+    EA,
+    WA,
+  };
+}
 
     function displayObjectInfo(info) {
       if (!info) {
@@ -643,42 +740,9 @@ canvas#solarChart {
       const position = info.position || { x: 0, y: 0, z: 0 };
 
       infoPanel.innerHTML = `
+      <button onclick="printInfoPanel()">Print</button>
           <div class="info-section">
-            <h3>Building Information</h3>
-            <div class="info-row">
-              <span>Name:</span>
-              <span>${info.name || "Unnamed"}</span>
-            </div>
-            <div class="info-row">
-              <span>Vertices:</span>
-              <span>${formatNumber(info.vertices)}</span>
-            </div>
-            <div class="info-row">
-              <span>Position:</span>
-              <span>(${formatDecimal(position.x)}, ${formatDecimal(
-        position.y
-      )}, ${formatDecimal(position.z)})</span>
-            </div>
-          </div>
-      
-          <div class="info-section">
-            <h3>Light Analysis</h3>
-            <div class="info-row">
-              <span>Fully Lit (>60%):</span>
-              <span>${info.fullyLitPercent}%</span>
-            </div>
-            <div class="info-row">
-              <span>Partially Lit (30-60%):</span>
-              <span>${info.partiallyLitPercent}%</span>
-            </div>
-            <div class="info-row">
-              <span>Shadowed (<30%):</span>
-              <span>${info.shadowedPercent}%</span>
-            </div>
-          </div>
-      
-          <div class="info-section">
-            <h3>Area Analysis</h3>
+            <h3>Area Analysis (Current Time)</h3>
             <div class="info-row">
               <span>Total Surface Area:</span>
               <span>${formatDecimal(info.totalArea)} square meters</span>
@@ -702,20 +766,17 @@ canvas#solarChart {
           </div>
       
           <div class="info-section">
-            <h3>Solar Potential</h3>
-            <div class="info-row">
-              <span>BIPV Potential:</span>
-              <span>${formatDecimal(info.bipvPotential)} kWh/day</span>
-            </div>
+            <h3>Solar Potential (Current Time)</h3>
+            
             <div class="info-row">
               <span>Rooftop Solar Potential:</span>
               <span>${formatDecimal(info.rooftopPotential)} kWh/day</span>
             </div>
             <div class="info-row">
-              <span>Total Solar Potential:</span>
+              <span>BIPV Potential:</span>
               <span>${formatDecimal(
-        (info.bipvPotential || 0) + (info.rooftopPotential || 0)
-      )} kWh/day</span>
+        (info.bipvPotential + info.rooftopPotential))}
+        kWh/day</span>
             </div>
           </div>
         `;
@@ -750,6 +811,7 @@ canvas#solarChart {
     }
 
     async function simulateDay(latitude, longitude, date) {
+      renderer.render(scene, camera);
       if (!selectedObject?.isMesh) {
         console.warn("Please select a valid building first");
         return;
@@ -766,7 +828,7 @@ canvas#solarChart {
           datetime.setHours(hour);
           updateSunPosition(latitude, longitude, datetime);
 
-          const hourResult = analyzeObject(simulationObject);
+          const hourResult = analyzeObject(simulationObject,hour-6);
           if (hourResult) {
             results.push(hourResult);
             // Add current intensities to global array
@@ -789,6 +851,7 @@ canvas#solarChart {
         // After simulation completes, display graph
         displaySimulationGraph(results);
         displaySolarPotentialGraph(results);
+        displayNorthSouthwalaGraph(results);
       } catch (error) {
         console.error("Simulation failed:", error);
       } finally {
@@ -851,19 +914,13 @@ canvas#solarChart {
       for (let key in averageResult) {
         averageResult[key] = averageResult[key] / count;
       }
-
       return averageResult;
     }
 
     function displayAverageResults(averageResult) {
       const infoPanel = document.getElementById("infoPanel");
       infoPanel.innerHTML += `
-          <br><strong>Average Results</strong><br>
-          Fully Lit (>60%): ${averageResult.fullyLitPercent.toFixed(1)}%<br>
-          Partially Lit (30-60%): ${averageResult.partiallyLitPercent.toFixed(
-        1
-      )}%<br>
-          Shadowed (<30%): ${averageResult.shadowedPercent.toFixed(1)}%<br>
+          <br><h3>Daily Average Results</h3><br>
           Total Surface Area: ${averageResult.totalArea.toFixed(
         2
       )} square meters<br>
@@ -877,13 +934,10 @@ canvas#solarChart {
           Shadowed Area: ${averageResult.shadowedArea.toFixed(
         2
       )} square meters<br>
-          Verticle Surface Potential: ${averageResult.bipvPotential.toFixed(
-        2
-      )} kWh/day<br>
           Rooftop Solar Potential: ${averageResult.rooftopPotential.toFixed(
         2
       )} kWh/day<br>
-          Total Solar Potential: ${(
+          BIPV Potential: ${(
           averageResult.bipvPotential + averageResult.rooftopPotential
         ).toFixed(2)} kWh/day
         `;
@@ -1005,7 +1059,7 @@ canvas#solarChart {
             );
           }
           selectedObject.material = highlightMaterial;
-          const info = analyzeObject(selectedObject);
+          const info = analyzeObject(selectedObject,4);
           if (info) {
             displayObjectInfo(info);
           }
@@ -1138,8 +1192,6 @@ canvas#solarChart {
 
         const info = `
                 <strong>Simulation Information</strong><br>
-                Average Scene Color: RGB(${avgColor.r}, ${avgColor.g}, ${avgColor.b
-          })<br>
                 Latitude: ${AHMEDABAD_LAT}°<br>
                 Longitude: ${AHMEDABAD_LONG}°<br>
                 GHI: ${DEFAULT_GHI} kWh/m²/day<br>
@@ -1236,7 +1288,54 @@ canvas#solarChart {
       controls.target.copy(camera.position).add(forward);
     }
 
-    function applyHeatmapToObject(object, intensities) {
+    function handleZoomToMove(event) {
+    const forward = new THREE.Vector3(0, 0, -1);
+    forward.applyQuaternion(camera.quaternion);
+    forward.normalize();
+
+    const zoomSpeed = 15; // Adjust this value for sensitivity
+    const scrollDelta = -event.deltaY * 0.01; // Normalize scroll direction and scale
+
+    camera.position.addScaledVector(forward, scrollDelta * zoomSpeed);
+}
+
+// Add the event listener for the scroll wheel
+document.addEventListener("wheel", handleZoomToMove);
+function handleInput(event) {
+    if (event.type === "wheel") {
+        // Zoom in/out to move forward/backward
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyQuaternion(camera.quaternion);
+        forward.normalize();
+
+        const zoomSpeed = 0.5; // Adjust for sensitivity
+        const scrollDelta = -event.deltaY * 0.01; // Normalize scroll direction and scale
+
+        camera.position.addScaledVector(forward, scrollDelta * zoomSpeed);
+    } else if (event.type === "mousedown" && event.button === 0 && event.ctrlKey) {
+        // Rotate 180 degrees
+        const rotation = new THREE.Euler(0, Math.PI, 0, "YXZ"); // 180 degrees around Y-axis
+        const currentRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
+
+        camera.quaternion.setFromEuler(new THREE.Euler(
+            currentRotation.x,
+            currentRotation.y + rotation.y,
+            currentRotation.z,
+            "YXZ"
+        ));
+    }
+}
+
+// Add event listeners for scroll and mouse down
+document.addEventListener("wheel", handleInput);
+document.addEventListener("mousedown", handleInput);
+const heatmapMaterial = new THREE.MeshPhongMaterial({
+  vertexColors: true,
+  shininess: 0,
+  flatShading: true,
+});
+
+function applyHeatmapToObject(object, intensities) {
       if (!object?.isMesh || !intensities?.length) {
         console.warn("Invalid input for heatmap");
         return;
@@ -1297,18 +1396,15 @@ canvas#solarChart {
           colors[vertex * 3 + 2] = color.b;
         });
       }
-
       geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-      object.material = new THREE.MeshPhongMaterial({
-        vertexColors: true,
-        shininess: 0,
-        flatShading: true,
-      });
-
+      geometry.attributes.color.needsUpdate = true;
+      object.material = heatmapMaterial;
+      object.material.needsUpdate = true;           // Ensure material updates
+      
       // Update legend
       const legendHTML = `
             <div class="heatmap-legend">
-                <div class="legend-title">Solar Irradiance</div>
+                <div class="legend-title">Solar Irradiation</div>
                 <div class="heatmap-gradient" style="background: linear-gradient(
                     to right,
                     #313695,
@@ -1321,9 +1417,9 @@ canvas#solarChart {
                     #d73027
                 );"></div>
                 <div class="heatmap-labels">
-                    <span>Low</span>
-                    <span>Medium</span>
-                    <span>High</span>
+                    <span>0</span>
+                    <span></span>
+                    <span>255</span>
                 </div>
             </div>
         `;
@@ -1428,8 +1524,10 @@ canvas#solarChart {
         <div class="chart-title">Solar Exposure Analysis</div>
         <canvas id="lightingChart"></canvas>
     `;
-      document.body.appendChild(chartContainer);
-
+      var infoPanel = document.getElementById("infoPanel");
+      infoPanel.appendChild(chartContainer);
+      const br = document.createElement("br");
+      infoPanel.appendChild(br);
       // Prepare data
       const times = results.map((_, index) => index + 6);
       const fullyLitData = results.map((r) => r.fullyLitArea);
@@ -1547,8 +1645,11 @@ canvas#solarChart {
       chartContainer.innerHTML = `
         <div class="chart-title">Solar Power Generation Potential</div>
         <canvas id="solarChart"></canvas>
-    `;
-      document.body.appendChild(chartContainer);
+      `;
+    var infoPanel = document.getElementById("infoPanel");
+    infoPanel.appendChild(chartContainer);
+    const br = document.createElement("br");
+    infoPanel.appendChild(br);
 
       // Prepare data
       const times = results.map((_, index) => index + 6);
@@ -1656,28 +1757,115 @@ canvas#solarChart {
       });
     }
 
-    // Add CSS for new chart
-    const style = document.createElement("style");
-    style.textContent = `
-.solar-chart-container {
-    position: absolute;
-    bottom: 20px;
-    left: 640px;
-    background: var(--panel-bg);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    width: 600px;
-    z-index: 1000;
+  function displayNorthSouthwalaGraph(results) {
+  const existingChart = document.querySelector(".facadeChart");
+  if (existingChart) {
+    existingChart.remove();
+  }
+
+  const chartContainer = document.createElement("div");
+  chartContainer.className = "facadeChart";
+  chartContainer.innerHTML = `
+    <div class="chart-title">Facade-based BIPV Generation</div>
+    <canvas id="facadeBIPVchart"></canvas>
+  `;
+  var infoPanel = document.getElementById("infoPanel");
+  infoPanel.appendChild(chartContainer);
+  const br = document.createElement("br"); // Add line break
+  infoPanel.appendChild(br);
+
+  // Prepare data
+  const times = results.map((_, index) => index + 6);
+  const NBipvData = results.map((r) => r.NBipv);
+  const SBipvData = results.map((r) => r.SBipv);
+  const EBipvData = results.map((r) => r.EBipv);
+  const WBipvData = results.map((r) => r.WBipv);
+
+  // Create chart
+  const ctx = document.getElementById("facadeBIPVchart").getContext("2d");
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: times.map((t) => `${t}:00`),
+      datasets: [
+        {
+          label: "North BIPV",
+          data: NBipvData,
+          borderColor: "#2196f3",
+          backgroundColor: "rgba(33, 150, 243, 0.1)",
+          fill: false,
+          tension: 0.4,
+          borderWidth: 2,
+        },
+        {
+          label: "South BIPV",
+          data: SBipvData,
+          borderColor: "#9c27b0",
+          backgroundColor: "rgba(156, 39, 176, 0.1)",
+          fill: false,
+          tension: 0.4,
+          borderWidth: 2,
+        },
+        {
+          label: "East BIPV",
+          data: EBipvData,
+          borderColor: "#ff9800",
+          backgroundColor: "rgba(255, 152, 0, 0.1)",
+          fill: false,
+          tension: 0.4,
+          borderWidth: 2,
+        },
+        {
+          label: "West BIPV",
+          data: WBipvData,
+          borderColor: "#4caf50",
+          backgroundColor: "rgba(76, 175, 80, 0.1)",
+          fill: false,
+          tension: 0.4,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+        },
+        title: {
+          display: true,
+          text: 'Facade-based BIPV Generation Over Time'
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+        },
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Time of Day'
+          }
+        },
+        y: {
+          display: true,
+          title: {
+            display: true,
+            text: 'BIPV Generation (kWh/day)'
+          },
+          beginAtZero: true
+        }
+      }
+    },
+  });
 }
 
-canvas#solarChart {
-    width: 100% !important;
-    height: 300px !important;
-    margin: 0;
-}
-`;
-    document.head.appendChild(style);
+
+
+  
   </script>
 </body>
 
